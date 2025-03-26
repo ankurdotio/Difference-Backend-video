@@ -1,222 +1,129 @@
-# Google Authentication with Passport.js in Node.js
-
-This guide will walk you through setting up Google Authentication in a Node.js application using Passport.js.
-
 ## Prerequisites
 
-- Node.js installed on your machine.
-- A Google account to create OAuth credentials.
+Before we begin, ensure you have the following:
 
-## Getting Started
+- **Node.js** installed on your machine.
+- A **Google account** to create OAuth credentials.
+- Basic knowledge of JavaScript and Node.js.
 
-### 1. Create a New Node.js Project
+## Step 1: Set Up Google OAuth Credentials
 
-1. Open your terminal.
-2. Navigate to the directory where you want to create your project.
-3. Run the following commands to create a new Node.js project:
+To authenticate users via Google, you'll need to set up OAuth 2.0 credentials in the Google Cloud Console.
 
-```bash
-mkdir google-auth-passport
-cd google-auth-passport
-npm init -y
+1. **Access the Google Cloud Console**:
+   - Navigate to the [Google Cloud Console](https://console.cloud.google.com/).
+   - Sign in with your Google account.
+
+2. **Create a New Project**:
+   - Click on the project dropdown at the top of the page.
+   - Select "New Project."
+   - Provide a name for your project and click "Create."
+
+3. **Enable the OAuth Consent Screen**:
+   - In the navigation menu, go to **APIs & Services** > **OAuth consent screen**.
+   - Choose "External" for user type and click "Create."
+   - Fill in the required details:
+     - **App name**: Your application's name.
+     - **User support email**: Your email address.
+     - **Developer contact information**: Your email address.
+   - Click "Save and Continue."
+
+4. **Create OAuth 2.0 Credentials**:
+   - Navigate to **APIs & Services** > **Credentials**.
+   - Click on **Create Credentials** and select **OAuth client ID**.
+   - Choose "Web application" as the application type.
+   - Set the **Authorized redirect URIs** to:
+     ```
+     http://localhost:3000/auth/google/callback
+     ```
+   - Click "Create."
+   - Note down the **Client ID** and **Client Secret** displayed.
+
+## Step 2: Initialize the Node.js Project
+
+1. **Create a New Directory for Your Project**:
+   - Open your terminal or command prompt.
+   - Run the following commands:
+     ```bash
+     mkdir google-auth-jwt
+     cd google-auth-jwt
+     ```
+
+2. **Initialize the Project**:
+   - Initialize a new Node.js project by running:
+     ```bash
+     npm init -y
+     ```
+   - This will create a `package.json` file with default settings.
+
+3. **Install Required Dependencies**:
+   - Install the necessary packages:
+     ```bash
+     npm install express passport passport-google-oauth20 jsonwebtoken dotenv
+     ```
+     - **express**: Web framework for Node.js.
+     - **passport**: Authentication middleware.
+     - **passport-google-oauth20**: Google OAuth 2.0 strategy for Passport.
+     - **jsonwebtoken**: Library to work with JSON Web Tokens.
+     - **dotenv**: Loads environment variables from a `.env` file.
+
+## Step 3: Configure Environment Variables
+
+1. **Create a `.env` File**:
+   - In the root of your project directory, create a file named `.env`.
+   - Add the following lines, replacing placeholders with your actual Google OAuth credentials and a secret key for JWT:
+     ```env
+     GOOGLE_CLIENT_ID=your-google-client-id
+     GOOGLE_CLIENT_SECRET=your-google-client-secret
+     JWT_SECRET=your-jwt-secret
+     ```
+     - **GOOGLE_CLIENT_ID**: Your Google OAuth Client ID.
+     - **GOOGLE_CLIENT_SECRET**: Your Google OAuth Client Secret.
+     - **JWT_SECRET**: A secret key for signing JWTs.
+
+## Step 4: Set Up the Express Application
+
+1. **Create the `app.js` File**:
+   - In your project directory, create a file named `app.js`.
+
+2. **Import Required Modules and Configure Middleware**:
+   - Open `app.js` and add the following code:
+     ```javascript
+     require('dotenv').config();
+     const express = require('express');
+     const passport = require('passport');
+     const jwt = require('jsonwebtoken');
+     const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
+
+     const app = express();
+
+     app.use(passport.initialize());
+
+     // Configure Passport to use Google OAuth 2.0 strategy
+     passport.use(new GoogleStrategy({
+       clientID: process.env.GOOGLE_CLIENT_ID,
+       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+       callbackURL: '/auth/google/callback',
+     }, (accessToken, refreshToken, profile, done) => {
+       // Here, you would typically find or create a user in your database
+       // For this example, we'll just return the profile
+       return done(null, profile);
+     }));
+
+     // Route to initiate Google OAuth flow
+     app.get('/auth/google',
+       passport.authenticate('google', { scope: ['profile', 'email'] })
+     );
+
+     // Callback route that Google will redirect to after authentication
+     app.get('/auth/google/callback',
+       passport.authenticate('google', { session: false }),
+       (req, res) => {
+         // Generate a JWT for the authenticated user
+         const token = jwt.sign({ id: req.user.id, displayName: req.user.displayName }, process.env.JWT_SECRET, { expiresIn: '1h' });
+         // Send the token to the client
+         res.json({ token });
+       }
+     );
+
 ```
-
-### 2. Install Required Dependencies
-
-Install the necessary packages for your Node.js application:
-
-```bash
-npm install express passport passport-google-oauth20 express-session dotenv
-```
-
-### 3. Set Up Google OAuth Credentials
-
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project.
-3. Navigate to **APIs & Services**
-4. Configure the OAuth consent screen (if not already done).
-5. Navigate to **Credentials**.
-6. Click on **Create Credentials** and select **OAuth 2.0 Client IDs**.
-7. Set the **Authorized redirect URIs** to:
-
-   ```
-   http://localhost:3000/auth/google/callback
-   ```
-
-7. After creating your credentials, note down the **Client ID** and **Client Secret**.
-
-### 4. Create a `.env` File
-
-In the root of your project, create a `.env` file and add your Google Client ID and Client Secret:
-
-```plaintext
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-```
-
-### 5. Set Up the Express Application
-
-#### 5.1. Create the `app.js` File
-
-First, you need to create a file named `app.js` in the root of your project. This file will contain all the necessary code for setting up your Express application.
-
-#### 5.2. Load Environment Variables
-
-In order to securely manage your credentials, load the environment variables from the `.env` file you created earlier:
-
-```javascript
-require('dotenv').config();
-```
-
-This line will load your Google Client ID and Client Secret from the `.env` file.
-
-#### 5.3. Import Required Packages
-
-Next, you need to import the required packages, including `express`, `express-session`, `passport`, and `passport-google-oauth20`:
-
-```javascript
-const express = require('express');
-const session = require('express-session');
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
-```
-
-These packages are essential for setting up your Express server, managing sessions, and handling Google OAuth with Passport.js.
-
-#### 5.4. Initialize Express
-
-Create an instance of an Express application:
-
-```javascript
-const app = express();
-```
-
-This `app` will serve as your main application object, where you’ll define routes and middleware.
-
-#### 5.5. Set Up Express Session Middleware
-
-To handle user sessions, you need to set up session management:
-
-```javascript
-app.use(session({
-  secret: 'your-secret-key',
-  resave: false,
-  saveUninitialized: true,
-}));
-```
-
-Here:
-- `secret` is used to sign the session ID cookie.
-- `resave: false` prevents the session from being saved back to the session store if it wasn't modified.
-- `saveUninitialized: true` forces a session that is "uninitialized" (new but not modified) to be saved to the store.
-
-#### 5.6. Initialize Passport Middleware
-
-Next, you need to initialize Passport and its session handling:
-
-```javascript
-app.use(passport.initialize());
-app.use(passport.session());
-```
-
-These lines ensure that Passport is initialized and can manage sessions for logged-in users.
-
-#### 5.7. Configure Google OAuth Strategy
-
-Set up Passport to use the Google OAuth strategy:
-
-```javascript
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: '/auth/google/callback'
-},
-function(accessToken, refreshToken, profile, done) {
-  // Here you can save the user profile to your database
-  return done(null, profile);
-}));
-```
-
-- The `clientID` and `clientSecret` are fetched from environment variables.
-- `callbackURL` is the URL where Google will redirect users after they authenticate.
-- The callback function receives the user's profile and tokens, where you can handle user data (e.g., saving it to your database).
-
-#### 5.8. Set Up Serialize and Deserialize Functions
-
-To manage user sessions, Passport needs to serialize the user’s data into the session and deserialize it on subsequent requests:
-
-```javascript
-passport.serializeUser((user, done) => {
-  done(null, user);
-});
-
-passport.deserializeUser((user, done) => {
-  done(null, user);
-});
-```
-
-- `serializeUser`: Determines what data should be stored in the session.
-- `deserializeUser`: Retrieves the user’s data from the session.
-
-#### 5.9. Define Routes
-
-Now, set up the routes for your application:
-
-```javascript
-app.get('/', (req, res) => {
-  res.send('<h1>Home</h1><a href="/auth/google">Login with Google</a>');
-});
-
-app.get('/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
-
-app.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/' }),
-  (req, res) => {
-    res.redirect('/profile');
-  }
-);
-
-app.get('/profile', (req, res) => {
-  res.send(`<h1>Profile</h1><pre>${JSON.stringify(req.user, null, 2)}</pre>`);
-});
-```
-
-- The home route (`/`) displays a link to log in with Google.
-- The `/auth/google` route initiates the Google OAuth flow.
-- The `/auth/google/callback` route handles the response from Google, authenticates the user, and redirects to the profile page.
-- The `/profile` route displays the authenticated user's profile information.
-
-#### 5.10. Start the Server
-
-Finally, start your Express server to listen for incoming requests:
-
-```javascript
-app.listen(3000, () => {
-  console.log('Server is running on http://localhost:3000');
-});
-```
-
-This starts the server on port 3000, and you can access it at `http://localhost:3000`.
-
-
-### 6. Run the Application
-
-Start your Node.js application:
-
-```bash
-node app.js
-```
-
-Visit `http://localhost:3000` in your browser, and you should see a link to log in with Google.
-
-### 7. Test the Authentication
-
-1. Click on "Login with Google."
-2. You will be redirected to Google to authorize the application.
-3. After successful authentication, you will be redirected to the `/profile` route, where you can see the user's profile information.
-
----
-
-This setup should get you started with Google Authentication in your Node.js application using Passport.js. If you have any specific requirements or need further customization, feel free to ask!
